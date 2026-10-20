@@ -1,3 +1,5 @@
+> 本作品用 **Opus 5.5** 复现思花的《[坠伞](https://www.xiaohongshu.com/search_result/6acb4bae0000000018038dae?xsec_token=AB9LEgpBHkLY_vXZDyRqymFuqCSdq9Eisumk19Sf8fgMs=&xsec_source=pc_search)》。
+
 # 接住星星的伞
 
 一把被风掀翻的线框伞，在阵风里接住星星，再把它们吹向天空。竖版 3:4 的 p5.js 生成艺术，约 69 秒，带原创配乐。
