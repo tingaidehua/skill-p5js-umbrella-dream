@@ -2,9 +2,21 @@
 
 一把被风掀翻的线框伞，在阵风里接住星星，再把它们吹向天空。竖版 3:4 的 p5.js 生成艺术，约 69 秒，带原创配乐。
 
+<p align="center">
+  <a href="https://tingaidehua.github.io/skill-p5js-umbrella-dream/">
+    <img src="assets/preview.jpg" alt="接住星星的伞网页画面" width="420">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/tingaidehua/skill-p5js-umbrella-dream/raw/main/case/接住星星的伞_字幕版.mp4">
+    <img alt="下载视频" src="https://img.shields.io/badge/%E4%B8%8B%E8%BD%BD%E8%A7%86%E9%A2%91-MP4-141ce6?style=for-the-badge">
+  </a>
+</p>
+
 **在线观看：** https://tingaidehua.github.io/skill-p5js-umbrella-dream/
 
-打开页面后点击画面开始。右下角可以开关字幕、旁白、声音，也可以复制创作轨迹。配乐文件是 `template/score.mp3`，和画面放在一起，手机静音键不会把声音吞掉。
+打开页面后点击画面开始。右下角可以开关字幕、旁白、声音，也可以复制创作轨迹。配乐文件是 `template/score.mp3`，和画面放在一起，手机静音键不会把声音吞掉。上面的按钮下载的是字幕版成片。
 
 ## 仓库里有什么
 
