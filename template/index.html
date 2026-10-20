@@ -1,0 +1,1084 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>接住星星的伞</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;500&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #141ce6; --ink: rgba(255,255,255,.8); --chip: rgba(255,255,255,.10); --chip-b: rgba(255,255,255,.24); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #141ce6; } }
+  :root[data-theme="dark"] { --bg: #141ce6; }
+  html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; }
+  body { display: flex; align-items: center; justify-content: center; }
+  canvas { display: block; cursor: pointer; }
+  #ui { position: fixed; right: 16px; bottom: 16px; display: flex; gap: 8px; opacity: 0; transition: opacity .8s; }
+  #ui.on { opacity: 1; }
+  #ui button { font: 12px/1 "Noto Serif SC", serif; color: var(--ink); background: var(--chip);
+    border: 1px solid var(--chip-b); border-radius: 999px; padding: 8px 12px; letter-spacing: .1em; cursor: pointer;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+  #ui button[aria-pressed="false"] { opacity: .5; }
+  #ui { flex-wrap: wrap; justify-content: flex-end; max-width: calc(100vw - 32px); }
+  #trajBox { position: fixed; inset: 0; background: rgba(6,9,70,.72); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  #trajBox[hidden] { display: none; }
+  .tb-inner { width: min(640px, 100%); background: rgba(20,28,180,.92); border: 1px solid var(--chip-b); border-radius: 12px; padding: 16px; color: var(--ink); font: 13px/1.6 "Noto Serif SC", serif; }
+  .tb-inner textarea { width: 100%; height: 50vh; box-sizing: border-box; background: rgba(0,0,0,.25); color: #fff; border: 1px solid var(--chip-b); border-radius: 8px; padding: 10px; font: 12px/1.5 ui-monospace, Menlo, monospace; }
+  .tb-inner button { margin-top: 10px; font: inherit; color: var(--ink); background: var(--chip); border: 1px solid var(--chip-b); border-radius: 999px; padding: 6px 14px; cursor: pointer; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+</head>
+<body>
+<div id="ui">
+  <button id="bCap" aria-pressed="true">字幕</button>
+  <button id="bNarr" aria-pressed="false" title="用设备自带的中文语音朗读字幕">旁白</button>
+  <button id="bSnd" aria-pressed="true">声音</button>
+  <button id="bTraj" title="复制完整的创作轨迹，交给其他智能体继续优化">复制轨迹</button>
+  <button id="bVid" title="下载 1080×1440 竖版 MP4，适合小红书、抖音">下载视频</button>
+</div>
+<div id="trajBox" hidden>
+  <div class="tb-inner">
+    <p>浏览器不允许直接写入剪贴板，请全选后手动复制：</p>
+    <textarea id="trajTa" readonly></textarea>
+    <button id="trajClose">关闭</button>
+  </div>
+</div>
+<script type="text/markdown" id="trajectory">
+# 创作轨迹 · 接住星星的伞（p5.js 生成艺术）
+
+> 这是一份可交给任何智能体（豆包、WorkBuddy、Claude、DeepSeek……）继续接力的完整轨迹：
+> 每一步都记录了「用户说了什么 → 智能体怎么想 → 做了什么 → 看到了什么 → 交付了什么」。
+> 接手时请先读「当前状态」和「已知问题与下一步」，再按需回看具体步骤。
+
+## 当前状态（v7）
+
+- 作品：竖幅 3:4，69 秒。一把线框伞被斜向上的阵风掀翻，伞骨全部指向天空，在风里发抖、挣扎；
+  星星落进伞里、沿伞线停留，再被风一颗颗吹走，拖着尾巴飞向右上方；伞骨尖上挂着月牙、铃铛、星星、水滴、小鱼五个挂件，被风托起来乱舞。
+- 声音：原创配乐，D 小调，72 BPM，偏悲伤。0–3.2 秒前奏（低处嗡鸣 + 由暗到亮的气息 + 零星闪光音），3.2 秒落拍时伞被掀翻；
+  之后是 Dm(add9) – B♭maj7 – Gm9 – A7sus4 循环，八音盒八分音符、带颤音的叹息式主旋律、低音弦、很轻的“心跳”底鼓；结尾一串往下落的音。
+- 交付物：网页（字幕 / 旁白 / 声音 / 复制轨迹 / 下载视频）、无字幕成片、字幕版成片、配乐 mp3、本轨迹、skill-p5js 压缩包。
+
+## 关键参数（想调效果先动这些）
+
+| 位置 | 参数 | 作用 |
+|---|---|---|
+| 顶部常量 | `NR=10, K=8` | 伞骨数量、每根伞骨分段 |
+| 顶部常量 | `BPM=72, DROP=3.2, DUR=69` | 节拍、落拍时刻、总时长（画面与音乐共用） |
+| `state()` | `o` 0.85→1.65s 撑开；`v` 2.25→3.45s 翻转 | 开场三幕的时间点 |
+| `buildMesh()` | `ia = 2.12 + …`、`ib = ia + 0.40 + …`、`clamp(ia,1.95,2.9)` | 翻转后伞骨的角度（越接近 π 越竖直向上）；clamp 保证永不放平 |
+| `effort()` | 周期 `BAR*2` | 伞“想合拢”的挣扎节奏 |
+| `windAngle()` | `-1.18 ± 0.30` | 风向在偏上/偏右之间摆动的范围 |
+| `gustAt()` | `0.35 + 1.25 * noise^1.7` | 阵风强弱带，顺风推进 |
+| `field()` | `base 0.19U`、`swirl 0.24U`、尺度 `0.26U` | 基础风速、涡旋强度与尺度 |
+| `update()` | `lRate = 14 + 48*…` | 伞线上冒星的速率（太密就调小） |
+| `liftOff()` | `sp 0.03–0.09U`、`drag 0.9–1.8` | 被吹走时的初速与“跟风”程度 |
+| `makeCanvas()` | `air` 190 颗 | 空中漂浮星星数量 |
+| `Score` | `CHORDS`、`MELODY`、`MELODY2` | 和弦、主旋律（可整段替换风格） |
+
+## 步骤
+
+### Step 1 · 用户
+> 帮我复现这个数字艺术视频，用的 p5js 框架做的，你要深刻理解视频作者的心思，然后再转换为艺术，再转换为程序。（附 13 秒竖屏视频）
+
+**思考**：先“看懂”再动手。需要知道构图、时间结构、色彩、线条质感、粒子形状。
+**动作**：ffprobe 读规格（1440×1920，30fps，13.3s）；每秒抽一帧拼成联系表；开场 0.4s 起 4fps 细看撑开过程；第 8 秒局部放大看粒子细节；对背景逐行取色。
+**观察**：三幕——合拢的伞翻滚 → 撑开（线框锥形） → 被风吹翻成碗；之后星形/十字/圆圈粒子越来越多，顶点有横向镜头光斑；背景深蓝 rgb(20,30,232) 到天蓝 rgb(58,126,253)。
+**理解**：伞本来挡雨，被吹翻后成了一只碗——“坏掉”变成“盛满”。
+**实现**：2D canvas + 手写 3D 投影（spin/pitch/lean + 透视），伞骨按角度区间插值（合拢→撑开→翻转），加法混合发光，光斑用预渲染精灵。
+**验证**：CDN 在沙箱里不可达 → 写了一个只用于截图测试的 p5 最小替身（random/noise/createCanvas 等），用无头 Chromium 按时间快进截图对照。
+**结果**：v1 发布。
+
+### Step 2 · 用户
+> 伞的骨架应该有一种人格化，似乎在风中努力挣扎，星星下落，大风向上……骨架吹向斜上不断挣扎，伞上的小挂件被吹上舞动。你可以发挥想象，让整个场景更加诗意化，单独生成不一样的配音，要有感染力，想象你在梦中。
+
+**思考**：人格化 = 有“意志”的周期性动作：想合拢（effort）→ 被风更狠地掀回（slam）。挂件需要真实的绳子物理。
+**动作**：引入 `windAt / effort` 情绪曲线；伞骨依次“攥紧”（相位差 0.07s），沿伞骨传波；verlet 绳链挂件；梦呓字幕九句；Web Audio 生成配乐（和弦垫、八音盒、风声、挣扎低音、接星玻璃铃）；离线渲染整片 mp4（逐帧截图 + OfflineAudioContext 混音 + ffmpeg）。
+**结果**：v2。问题：挣扎时伞面被压平；伞柄丝带过长；混音偏轻（−29.8 dB，经 loudnorm 修正）。
+
+### Step 3 · 用户
+> 声音换下，不用下雨风声，换点类似原视频的……伞骨架细一些，风是斜上的，伞骨架应该不会变平，应该全部吹向上表现了风大，伞柄底部那个布不用了。总之应该尽量还原原视频，可能还有一些细节没有想到。
+
+**思考**：回到原片做更细的取证。
+**动作**：
+1. 对原片音频做频谱：0–3s 宽带上扬噪声 → 约 3s 落拍 → 中频拨弦琶音、低频和弦与底鼓。按同类风格**原创**一首（不照搬旋律）。
+2. 截取第 6 秒相邻两帧局部对比 → **关键发现**：粒子的尾巴在下、星形在上，说明星星是从伞线上被风**向上吹走**的，而不是从天上落下。此前理解错了。
+**实现**：粒子生命周期改为「在伞线上生成/落入 → 停留并滑向伞心 → 被风吹离，带历史轨迹尾巴」；伞骨角度 clamp 保证始终向上；线宽减到约 1.15px；去掉丝带、暗角、风丝；背景严格按原片取色。
+**验证**：频谱发现低频过重，压低底鼓与低音、提高琶音后重渲。
+**结果**：v3，提供无字幕版（贴近原片）与字幕版。
+
+### Step 4 · 用户
+> 空中散布的星星再多点，伞往上吹的东西太密太快了，风也不是完全直线斜上猛吹，应该更像真实的大风。
+
+**实现**：
+- 新增 `air`：190 颗远景星（四角星/十字/圆圈/点），按深度随风慢漂并闪烁。
+- 风场 `field(x,y,t)`：风向缓慢摆动 + 顺风推进的阵风带 + 卷曲噪声（curl noise）涡旋；粒子用阻力追随当地风速（不再无限加速）。
+- 冒星速率 210 → 48，停留 0.8–5.5s，初速 0.03–0.09U。
+- 伞的晃动、挂件、落星都用同一风场，保证“同一股风”。
+**结果**：v4。
+
+### Step 5 · 用户
+> 好像没听到声音，已经开了
+
+**排查**：成片音轨正常（−17 dB）。网页用实时 Web Audio：iPhone 静音键会静音 Web Audio，部分内嵌页面也起不来。
+**修复**：配乐作为 `score.mp3` 随页面发布，用 `<audio>` 播放（和视频同一通道）；加载失败才回退到页面内离线合成。画面时间由 `player.currentTime` 驱动，字幕与音乐对齐。
+**结果**：v5。
+
+### Step 6 · 用户
+> 配音再悲伤一点；给一个 skill-p5js- 开头的 zip；网页再增加两个按钮：复制轨迹、下载视频（用于小红书、抖音）；复制轨迹类似 DeepSeek harness 的轨迹功能，从而优化调整，吸收不同智能体的优点，这也反映了制作的完整工作流。
+
+**实现**：
+- 配乐改为 D 小调、72 BPM：慢起的和弦垫、八音盒八分音符、带颤音的叹息式主旋律（第二轮落在更低处）、低音弦、仅一两下的“心跳”底鼓，混响加长；画面的挣扎周期与“心跳”光斑同步新节拍。
+- 网页按钮：`复制轨迹`（剪贴板 → execCommand → 手动复制面板三级回退）、`下载视频`（随当前字幕开关选择版本；claude.ai 内用 downloads 能力，其他环境用 `<a download>`）。
+- 成片按 1080×1440、两遍编码压到 15MB 以内，便于网页内下载与社媒上传。
+- 打包 `skill-p5js-umbrella-dream.zip`：SKILL.md（工作流）、模板网页、渲染脚本、参数说明、本轨迹。
+**结果**：v6/v7。
+
+## 已知问题与下一步（欢迎其他智能体接力）
+
+1. 成片由测试替身渲染；真实 p5.js 下 `noise()` 实现不同，画面细节会略有差异（构图与节奏一致）。可在本地装好 p5 后用 `scripts/render_frames.js` 重渲。
+2. 旁白目前依赖设备自带 TTS。若有高质量中文语音合成，可按 `LINES` 的时间点生成并混入配乐。
+3. 原片只有 13 秒；本作扩展到 69 秒。若要 15 秒短版用于抖音开头，可只渲染 0–15s 并在第 13 秒做淡出。
+4. 风场参数仍可调：`swirl` 大 → 更乱更像暴风；`base` 大 → 更猛更直。
+5. 可尝试：伞面加极淡的半透明填充；挂件碰撞时触发音效；让观众用鼠标/陀螺仪改变风向。
+
+## 制作流水线（可复用）
+
+1. 取证：`ffprobe` 规格 → 每秒抽帧拼联系表 → 关键段高帧率细看 → **相邻帧局部对比判断运动方向** → 背景逐行取色 → 音频频谱判断结构与风格。
+2. 意图：用一句话说出作者的“心思”，再决定视觉语言（线、光、粒子、节奏）。
+3. 程序：时间线函数（撑开/翻转/镜头）→ 3D 线框 → 粒子生命周期 → 风场 → 挂件物理 → 光斑 → 字幕。
+4. 声音：Web Audio 写成可离线渲染的乐谱类；网页播放预渲染文件。
+5. 渲染：无头 Chromium 固定步长逐帧截图（30fps）+ OfflineAudioContext 导出 WAV → `loudnorm` → ffmpeg 合成 H.264/AAC。
+6. 验证：联系表抽查画面、`volumedetect` 与频谱检查声音、点击测试网页播放。
+7. 交付：网页 + 无字幕/字幕两版 MP4 + 配乐 + 轨迹 + skill 包。
+</script>
+<script>
+/* ==========================================================================
+   接住星星的伞
+   一把被斜向上的风吹翻的伞。它的骨头全被掀向天空，在风里发抖、挣扎，
+   却始终不肯折断。星星落进它翻过来的怀里，在伞线上停一会儿，
+   又被风一颗颗吹走，拖着细长的尾巴飞向右上方。
+   p5.js · 手写 3D 投影 · verlet 挂件 · Web Audio 原创配乐
+   ========================================================================== */
+
+const NR = 10, K = 8, SHAFT = 1.75, MAX_SIT = 750;
+const DUR = 69;
+const BPM = 72, BEAT = 60 / BPM, BAR = BEAT * 4, DROP = 3.2;   // 第 3.2 秒落拍：伞刚好被风掀翻
+const WIND_DIR = (() => { const x = 0.38, y = -1, l = Math.hypot(x, y); return [x / l, y / l]; })();
+const FONT = '"Noto Serif SC","Noto Serif CJK SC","Noto Serif CJK TC","Songti SC",serif';
+const RENDER_CAPS = !/nocap/.test(location.search);
+
+const LINES = [
+  [4.0, 9.6,  '我梦见一把伞，\n在没有雨的夜里撑开。'],
+  [10.5, 16.2, '风从地面升起，\n要把它吹回天上。'],
+  [17.0, 23.6, '它的骨头全被掀向天空，\n抖着，却一根也没有折断。'],
+  [24.5, 31.6, '星星落进它翻过来的怀里，\n停一会儿，又被风接走。'],
+  [32.5, 39.6, '挂在它身上的小东西被风托起，\n像一群不肯睡的孩子在跳舞。'],
+  [40.5, 47.0, '原来坏掉的地方，\n正好能盛住光。'],
+  [48.0, 55.0, '盛不下的那些，\n就让风送它们回家。'],
+  [56.5, 61.2, '如果有一天，你也被风吹翻了——'],
+  [61.8, 67.2, '别怕。\n抬起头，接住它们。'],
+];
+
+let W, H, U, PX;
+let bgG, glowS, flareS;
+let T = 0, started = false, M = null, spawnAcc = 0, lineAcc = 0;
+let rain = [], sit = [], fly = [], bursts = [], dust = [], air = [], charms = [], ribJ = [];
+let player = null, audioState = 'idle', soundOn = true, narrOn = false, capOn = RENDER_CAPS, spoken = new Set();
+
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const lerpF = (a, b, t) => a + (b - a) * t;
+const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+const easeOutBack = (t, s = 1.7) => { t = clamp(t, 0, 1); const c = s + 1; return 1 + c * Math.pow(t - 1, 3) + s * Math.pow(t - 1, 2); };
+const phase = (a, b, x) => clamp((x - a) / (b - a), 0, 1);
+
+/* ---------------- 乐曲结构（画面与声音共用） ---------------- */
+// 小节编号 b 从 DROP 开始；返回该小节的编配
+function section(b) {
+  if (b < 0) return 'intro';
+  if (b < 4) return 'a';        // 和弦 + 八音盒
+  if (b < 9) return 'b';        // + 主旋律 + 很轻的心跳
+  if (b < 14) return 'c';       // 主旋律高八度 + 低音弦
+  if (b < 17) return 'd';       // 抽空，只剩和弦与回声
+  if (b < 19) return 'c';       // 最后一次
+  return 'end';
+}
+const kickBeats = s => s === 'b' ? [0] : s === 'c' ? [0, 2] : [];
+function kickPulse(t) {                              // 最近一次“心跳”的余韵，让伞心随之呼吸
+  const tb = t - DROP; if (tb < 0) return 0;
+  const b = Math.floor(tb / BAR), ks = kickBeats(section(b)); if (!ks.length) return 0;
+  const inBar = tb - b * BAR; let last = -1;
+  for (const k of ks) if (k * BEAT <= inBar) last = k * BEAT;
+  return last < 0 ? 0 : Math.exp(-(inBar - last) * 5);
+}
+
+/* ---------------- 风与挣扎 ---------------- */
+function windProfile(t) {
+  const arrive = sstep(1.6, 3.2, t);
+  const arc = 0.9 + 0.45 * sstep(16, 26, t) - 0.3 * sstep(48, 51, t) + 0.3 * sstep(58.5, 60.5, t) - 0.5 * sstep(63, DUR, t);
+  return arrive * arc;
+}
+function effort(t) {                                  // 伞想收拢的那股劲：每两小节一次
+  const inten = sstep(5, 12, t) * (1 - 0.8 * sstep(58, 64, t));
+  const c = 0.5 - 0.5 * Math.cos(TAU * (t - DROP) / (BAR * 2));
+  return inten * Math.pow(c, 3);
+}
+// 风向：在“偏上”和“偏右”之间缓慢摆动（屏幕坐标，-π/2 为正上方）
+function windAngle(t) { return -1.18 + 0.30 * (noise(t * 0.11, 50) - 0.5) * 2 + 0.10 * Math.sin(t * 0.33); }
+// 阵风：一团一团顺着风向推进的强弱带
+function gustAt(x, y, t) {
+  const a = windAngle(t), ux = Math.cos(a), uy = Math.sin(a);
+  const along = (x * ux + y * uy) / U, across = (-x * uy + y * ux) / U;
+  return 0.35 + 1.25 * Math.pow(noise(along * 1.4 - t * 0.5, across * 0.9 + 17), 1.7);
+}
+// 风场：基础风 × 阵风 + 卷曲噪声带来的涡旋
+const FIELD = [0, 0];
+function field(x, y, t) {
+  const a = windAngle(t), g = gustAt(x, y, t), base = 0.19 * U * windProfile(t) * g;
+  const sc = 0.26 * U, e = 0.02, nx = x / sc, ny = y / sc, tz = t * 0.16;
+  const dpdy = (noise(nx, ny + e, tz) - noise(nx, ny - e, tz)) / (2 * e);
+  const dpdx = (noise(nx + e, ny, tz) - noise(nx - e, ny, tz)) / (2 * e);
+  const sw = 0.24 * U * windProfile(t) * (0.45 + 0.6 * g);
+  FIELD[0] = Math.cos(a) * base + dpdy * sw;
+  FIELD[1] = Math.sin(a) * base - dpdx * sw;
+  return FIELD;
+}
+function windAt(t) {
+  const g = gustAt(W * 0.56, H * 0.33, t);
+  return windProfile(t) * (0.45 + 0.55 * g + 0.4 * effort(t - 1.2));
+}
+
+/* ---------------- p5 ---------------- */
+function setup() {
+  pixelDensity(Math.min(2, displayDensity()));
+  makeCanvas();
+  randomSeed(7); noiseSeed(7);
+  for (let i = 0; i < NR; i++) ribJ.push({ a: random(-1, 1), b: random(-1, 1), l: random(-1, 1), p: random(-1, 1), n: random(1000) });
+  restart();
+  const cv = document.querySelector('canvas');
+  cv.addEventListener('pointerdown', () => { if (!started) begin(); else { restart(); playFromStart(); } });
+  prepareAudio();
+  const bC = document.getElementById('bCap'), bN = document.getElementById('bNarr'), bS = document.getElementById('bSnd');
+  bC.onclick = e => { e.stopPropagation(); capOn = !capOn; bC.setAttribute('aria-pressed', capOn); };
+  bN.onclick = e => { e.stopPropagation(); narrOn = !narrOn; bN.setAttribute('aria-pressed', narrOn); if (!narrOn && window.speechSynthesis) speechSynthesis.cancel(); };
+  document.getElementById('bTraj').onclick = e => { e.stopPropagation(); copyTrajectory(e.currentTarget); };
+  document.getElementById('bVid').onclick = e => { e.stopPropagation(); downloadVideo(e.currentTarget); };
+  document.getElementById('trajClose').onclick = () => { document.getElementById('trajBox').hidden = true; };
+  bS.onclick = e => { e.stopPropagation(); soundOn = !soundOn; bS.setAttribute('aria-pressed', soundOn); if (player) player.muted = !soundOn; };
+}
+function makeCanvas() {
+  const ww = windowWidth, wh = windowHeight;
+  H = Math.min(wh, ww * 4 / 3); W = H * 3 / 4;
+  if (!window._cv) window._cv = createCanvas(W, H); else resizeCanvas(W, H);
+  U = H; PX = H / 1920;
+  buildSprites(); buildBg();
+  air = [];
+  for (let i = 0; i < 190; i++) {
+    const sh = ['spark', 'spark', 'plus', 'x', 'ring', 'ring', 'dot', 'dot', 'dot', 'star'][Math.floor(random(10))];
+    air.push({ x: random(W), y: random(H), shape: sh, sz: random(0.0022, 0.0068) * U, rot: random(TAU), spin: random(-1, 1),
+      a: random(0.35, 0.85), ph: random(TAU), tw: random(0.6, 2.2), depth: random(0.25, 0.8) });
+  }
+  dust = [];
+  for (let i = 0; i < 160; i++) dust.push({ x: random(W), y: random(H), s: random(0.8, 2.4) * PX * 1.5, ph: random(TAU), sp: random(0.4, 1.6), r: random(0.2, 1) });
+}
+function windowResized() { makeCanvas(); }
+function restart() {
+  T = 0; rain = []; sit = []; fly = []; bursts = []; spawnAcc = 0; lineAcc = 0; spoken = new Set();
+  charms = [
+    { id: 0, rib: 1, s: K, n: 5, len: 0.026, shape: 'moon' },
+    { id: 1, rib: 4, s: K, n: 4, len: 0.028, shape: 'bell' },
+    { id: 2, rib: 6, s: K, n: 5, len: 0.024, shape: 'star' },
+    { id: 3, rib: 8, s: K, n: 4, len: 0.026, shape: 'drop' },
+    { id: 4, rib: 3, s: 6, n: 4, len: 0.022, shape: 'fish' },
+  ].map(c => ({ ...c, p: null, q: null, spark: 0, lastSpark: -9 }));
+  if (window.speechSynthesis) speechSynthesis.cancel();
+}
+function begin() {
+  if (audioState === 'rendering') return;            // 声音还在合成，等它好了再入梦
+  started = true; restart(); document.getElementById('ui').classList.add('on'); playFromStart();
+}
+/* 声音：页面打开时先离线把整首配乐合成成一段 WAV，再交给普通的 <audio> 播放。
+   这样不受 iPhone 静音键、内嵌页面对 Web Audio 的限制影响，和播放视频走同一条通道。 */
+function prepareAudio() {
+  // 首选：随页面发布的配乐文件，打开即可播放
+  try {
+    player = new Audio('score.mp3');
+    player.preload = 'auto'; player.muted = !soundOn;
+    player.addEventListener('error', () => { player = null; renderAudio(); }, { once: true });
+    audioState = 'ready';
+  } catch (e) { renderAudio(); }
+}
+async function renderAudio() {           // 备用：文件加载失败时，在页面里离线合成同一首配乐
+  const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  if (!OAC) { audioState = 'none'; return; }
+  audioState = 'rendering';
+  try {
+    const sr = 44100, ctx = new OAC(2, Math.ceil(sr * DUR), sr);
+    new Score(ctx, ctx.destination).start(0);
+    const buf = await new Promise((res, rej) => {
+      ctx.oncomplete = e => res(e.renderedBuffer);
+      const pr = ctx.startRendering(); if (pr && pr.then) pr.then(res, rej);
+    });
+    player = new Audio(URL.createObjectURL(wavBlob(buf)));
+    player.preload = 'auto'; player.muted = !soundOn;
+    audioState = 'ready';
+  } catch (e) { audioState = 'none'; }
+}
+function playFromStart() {
+  if (!player) return;
+  try { player.pause(); player.currentTime = 0; } catch (e) {}
+  player.muted = !soundOn;
+  const pr = player.play(); if (pr && pr.catch) pr.catch(() => {});
+}
+function wavBlob(buf) {
+  const L = buf.getChannelData(0), Rc = buf.numberOfChannels > 1 ? buf.getChannelData(1) : L, n = L.length, sr = buf.sampleRate;
+  const ab = new ArrayBuffer(44 + n * 4), v = new DataView(ab);
+  const w = (o, str) => { for (let i = 0; i < str.length; i++) v.setUint8(o + i, str.charCodeAt(i)); };
+  w(0, 'RIFF'); v.setUint32(4, 36 + n * 4, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+  v.setUint16(22, 2, true); v.setUint32(24, sr, true); v.setUint32(28, sr * 4, true); v.setUint16(32, 4, true); v.setUint16(34, 16, true);
+  w(36, 'data'); v.setUint32(40, n * 4, true);
+  for (let i = 0, o = 44; i < n; i++, o += 4) { v.setInt16(o, clamp(L[i], -1, 1) * 32767, true); v.setInt16(o + 2, clamp(Rc[i], -1, 1) * 32767, true); }
+  return new Blob([ab], { type: 'audio/wav' });
+}
+/* ---------------- 复制轨迹 / 下载视频 ---------------- */
+function flashBtn(btn, text) {
+  const old = btn.dataset.label || btn.textContent; btn.dataset.label = old;
+  btn.textContent = text; clearTimeout(btn._t); btn._t = setTimeout(() => { btn.textContent = old; }, 2200);
+}
+async function copyTrajectory(btn) {
+  const txt = document.getElementById('trajectory').textContent.trim();
+  let ok = false;
+  try { await navigator.clipboard.writeText(txt); ok = true; } catch (e) {}
+  if (!ok) {
+    const ta = document.createElement('textarea'); ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    ta.remove();
+  }
+  if (ok) flashBtn(btn, '已复制轨迹');
+  else { const box = document.getElementById('trajBox'), t = document.getElementById('trajTa'); t.value = txt; box.hidden = false; t.focus(); t.select(); }
+}
+async function downloadVideo(btn) {
+  if (btn.dataset.busy) return;
+  const src = capOn ? 'umbrella_sub.mp4' : 'umbrella.mp4';
+  const name = capOn ? '接住星星的伞_字幕版.mp4' : '接住星星的伞.mp4';
+  btn.dataset.busy = '1'; flashBtn(btn, '准备中…');
+  try {
+    const blob = await (await fetch(src)).blob();
+    const dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
+    if (dl) {
+      try { await dl.save({ filename: name, data: blob }); flashBtn(btn, '已保存'); }
+      catch (e) { flashBtn(btn, e && e.code === 'declined' ? '已取消' : '暂时无法下载'); }
+    } else {
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+      document.body.appendChild(a); a.click(); a.remove(); flashBtn(btn, '已开始下载');
+    }
+  } catch (e) { flashBtn(btn, '下载失败'); }
+  delete btn.dataset.busy;
+}
+function keyPressed() { if (key === 's' || key === 'S') saveCanvas('umbrella', 'png'); }
+
+/* ---------------- 背景与精灵 ---------------- */
+function buildBg() {
+  bgG = createGraphics(W, H); bgG.pixelDensity(1);
+  const c = bgG.drawingContext;
+  const g = c.createLinearGradient(0, 0, 0, H);           // 取色自原视频
+  g.addColorStop(0.00, 'rgb(20,30,232)');
+  g.addColorStop(0.30, 'rgb(25,35,244)');
+  g.addColorStop(0.50, 'rgb(28,42,242)');
+  g.addColorStop(0.70, 'rgb(37,73,250)');
+  g.addColorStop(0.90, 'rgb(52,110,251)');
+  g.addColorStop(1.00, 'rgb(58,126,253)');
+  c.fillStyle = g; c.fillRect(0, 0, W, H);
+}
+function buildSprites() {
+  glowS = document.createElement('canvas'); glowS.width = glowS.height = 128;
+  let c = glowS.getContext('2d');
+  let g = c.createRadialGradient(64, 64, 0, 64, 64, 64);
+  g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.15, 'rgba(230,240,255,0.75)');
+  g.addColorStop(0.4, 'rgba(150,185,255,0.22)'); g.addColorStop(1, 'rgba(120,150,255,0)');
+  c.fillStyle = g; c.fillRect(0, 0, 128, 128);
+  flareS = document.createElement('canvas'); flareS.width = 512; flareS.height = 32;
+  c = flareS.getContext('2d');
+  c.save(); c.translate(256, 16); c.scale(16, 1);
+  g = c.createRadialGradient(0, 0, 0, 0, 0, 16);
+  g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.25, 'rgba(210,225,255,0.45)'); g.addColorStop(1, 'rgba(160,190,255,0)');
+  c.fillStyle = g; c.fillRect(-16, -16, 32, 32); c.restore();
+}
+
+/* ---------------- 伞的姿态 ---------------- */
+function state(t) {
+  const o = easeOutBack(phase(0.85, 1.65, t), 1.4);
+  const v = easeOutBack(phase(2.25, 3.45, t), 1.1);
+  const k = sstep(0, 4.8, t);
+  const wind = windAt(t), E = effort(t);
+  const tumble = Math.exp(-t * 1.5) * Math.sin(t * 5.2 + 1.3);
+  const shake = v * (0.008 + 0.022 * wind) * Math.sin(t * 13.0) * Math.sin(t * 2.1 + 1);
+  const lean = -0.45 + 1.25 * tumble + v * (-0.12 * (wind - 0.9) + 0.08 * E + 0.05 * Math.sin(t * 0.55) + 0.08 * (noise(t * 0.6, 9) - 0.5) * wind) + shake;
+  const spin = 0.9 + t * 0.2 + 0.9 * (noise(t * 0.18, 3) - 0.5) + 0.6 * tumble + 0.1 * E;
+  const pitch = lerpF(0.18, 0.46, sstep(1.2, 3.8, t)) + 0.06 * Math.sin(t * 0.43 + 1) - 0.05 * E * v;
+  const sc = lerpF(0.165, 0.265, k) * U;
+  const ax = W / 2 + U * lerpF(-0.03, 0.035, k) + U * 0.01 * v * Math.sin(t * 0.37) + U * 0.01 * v * (wind - 0.9);
+  const ay = H / 2 + U * lerpF(-0.03, -0.085, k) + U * 0.007 * v * Math.sin(t * 0.51 + 2) - U * 0.022 * v * (wind - 0.9) + U * 0.01 * E * v;
+  return { o, v, wind, E, lean, spin, pitch, sc, ax, ay };
+}
+
+function buildMesh(t) {
+  const S = state(t);
+  const cy = Math.cos(S.spin), sy = Math.sin(S.spin);
+  const cx = Math.cos(S.pitch), sx = Math.sin(S.pitch);
+  const cz = Math.cos(S.lean), sz = Math.sin(S.lean);
+  const D = 7;
+  const P = (x, y, z) => {
+    const x1 = x * cy + z * sy, z1 = -x * sy + z * cy;
+    const y1 = y * cx - z1 * sx, z2 = y * sx + z1 * cx;
+    const x2 = x1 * cz - y1 * sz, y2 = x1 * sz + y1 * cz;
+    const f = D / (D - z2);
+    return [S.ax + x2 * S.sc * f, S.ay - y2 * S.sc * f, z2];
+  };
+  const ribs = [];
+  for (let i = 0; i < NR; i++) {
+    const j = ribJ[i], phi0 = i / NR * TAU;
+    let ta = lerpF(0.10, 1.42, S.o), tb = lerpF(-0.05, 0.80, S.o);
+    // 翻转后：所有伞骨都被掀向上方，绝不放平。挣扎体现在颤抖、扭转和骨尖的回勾
+    const Ei = effort(t - i * 0.07), wn = S.wind;
+    const bias = 0.10 * wn * Math.cos(phi0 + S.spin - 0.6);
+    const trem = (0.015 + 0.04 * wn) * Math.sin(t * (17 + i * 1.3) + j.n);
+    const fl = noise(j.n, t * 0.6) - 0.5;
+    let ia = 2.12 + 0.14 * j.a + 0.10 * wn + bias - 0.16 * Ei + trem + 0.10 * fl;
+    let ib = ia + 0.40 + 0.14 * j.b + 0.10 * wn - 0.22 * Ei + 1.5 * trem;
+    ia = clamp(ia, 1.95, 2.9); ib = clamp(ib, ia + 0.1, 3.08);
+    ta = lerpF(ta, ia, S.v); tb = lerpF(tb, ib, S.v);
+    const phi = phi0 + S.v * (0.10 * j.p + 0.14 * (noise(j.n + 7, t * 0.4) - 0.5) + 0.13 * Ei * Math.sin(i * 2.1 + 1));
+    const len = 1 + S.v * 0.1 * j.l;
+    const cp = Math.cos(phi), sp = Math.sin(phi);
+    let x = 0, y = 0, z = 0;
+    const pts3 = [[0, 0, 0]];
+    for (let k = 1; k <= K; k++) {
+      const u = (k - 0.5) / K;
+      const th = lerpF(ta, tb, u) + S.v * 0.09 * wn * u * Math.sin(u * 3.2 - t * 6.5 + i * 0.9);
+      const st = Math.sin(th);
+      x += st * cp * len / K; y += -Math.cos(th) * len / K; z += st * sp * len / K;
+      pts3.push([x, y, z]);
+    }
+    ribs.push(pts3.map(p => P(p[0], p[1], p[2])));
+  }
+  const hub = P(0, 0, 0), tip = P(0, 0.13, 0);
+  const runner = P(0, lerpF(lerpF(-0.95, -0.40, S.o), -0.14, S.v), 0);
+  const bottom = P(0, -SHAFT, 0);
+  const hook = [];
+  {
+    let dx = bottom[0] - hub[0], dy = bottom[1] - hub[1];
+    const L = Math.hypot(dx, dy) || 1; dx /= L; dy /= L;
+    let nx = -dy, ny = dx; if (nx < 0) { nx = -nx; ny = -ny; }
+    const r = 0.085 * S.sc, cxh = bottom[0] + nx * r, cyh = bottom[1] + ny * r;
+    for (let a = 0; a <= Math.PI * 1.1; a += 0.16) {
+      const ca = -Math.cos(a), sa = Math.sin(a);
+      hook.push([cxh + (nx * ca + dx * sa) * r, cyh + (ny * ca + dy * sa) * r]);
+    }
+  }
+  const edgeMid = [];
+  for (let i = 0; i < NR; i++) {
+    const A = ribs[i][K], B = ribs[(i + 1) % NR][K];
+    edgeMid.push([lerpF((A[0] + B[0]) / 2, hub[0], 0.06), lerpF((A[1] + B[1]) / 2, hub[1], 0.06) + (1 - S.v) * S.o * S.sc * 0.03]);
+  }
+  const segs = [];
+  const add = (a, b, w, c) => segs.push({ a, b, w, c });
+  for (let i = 0; i < NR; i++) for (let k = 1; k <= K; k++) add(ribs[i][k - 1], ribs[i][k], 1, true);
+  for (let i = 0; i < NR; i++) { add(ribs[i][K], edgeMid[i], 1, true); add(edgeMid[i], ribs[(i + 1) % NR][K], 1, true); }
+  for (let i = 0; i < NR; i++) add(ribs[i][1], ribs[(i + 1) % NR][1], 0.8, false);
+  for (let i = 0; i < NR; i++) add(ribs[i][5], ribs[(i + 1) % NR][5], 0.25 + 0.25 * S.v, true);
+  for (let i = 0; i < NR; i++) add(runner, ribs[i][3], 0.4, false);
+  for (let i = 0; i < NR; i += 2) add(ribs[i][4], ribs[(i + 1) % NR][K], 0.45 * S.v, S.v > 0.5);
+  for (let i = 1; i < NR; i += 3) add(ribs[i][6], ribs[(i + 2) % NR][2], 0.32 * S.v, S.v > 0.5);
+  const shaft = [[tip, hub], [hub, bottom], [bottom, hook[0]]];
+  for (let i = 1; i < hook.length; i++) shaft.push([hook[i - 1], hook[i]]);
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (const r of ribs) for (const p of r) { x0 = Math.min(x0, p[0]); y0 = Math.min(y0, p[1]); x1 = Math.max(x1, p[0]); y1 = Math.max(y1, p[1]); }
+  const catchable = []; for (let s = 0; s < segs.length; s++) if (segs[s].c) catchable.push(s);
+  return { S, ribs, hub, tip, bottom, hook, segs, shaft, catchable, box: [x0, y0, x1, y1] };
+}
+function ribAt(i, s) {
+  const r = M.ribs[i]; const k = clamp(Math.floor(s), 0, K - 1), f = clamp(s - k, 0, 1);
+  return [lerpF(r[k][0], r[k + 1][0], f), lerpF(r[k][1], r[k + 1][1], f)];
+}
+
+/* ---------------- 星：落下 → 停在伞线上 → 被风吹走 ---------------- */
+const SHAPES = ['spark', 'spark', 'spark', 'plus', 'plus', 'x', 'ring', 'ring', 'ring', 'dot', 'dot', 'star'];
+function newGlyph() { return { shape: random(SHAPES), sz: random(0.0035, 0.0095) * U, rot: random(TAU), spin: random(-2, 2), a: random(0.6, 1), ph: random(TAU) }; }
+function spawnRain() {
+  const vy = random(0.22, 0.5) * U, bc = (M.box[0] + M.box[2]) / 2;
+  rain.push({ ...newGlyph(), x: bc + randomGaussian(0.02, 0.12) * U, y: -random(0.02, 0.1) * U, vx: -vy * random(0.05, 0.15), vy, trail: random(0.06, 0.18) });
+}
+function segDist(px, py, a, b) {
+  const dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy || 1;
+  const t = clamp(((px - a[0]) * dx + (py - a[1]) * dy) / L2, 0, 1);
+  const qx = a[0] + dx * t - px, qy = a[1] + dy * t - py;
+  return [qx * qx + qy * qy, t, dx, dy, L2];
+}
+function sitOn(seg, t, g, hold) {
+  const s = M.segs[seg], dx = s.b[0] - s.a[0], dy = s.b[1] - s.a[1], L = Math.hypot(dx, dy) || 1;
+  const off = randomGaussian(0, 0.004);
+  const c = { ...g, born: T, hold, ox: -dy / L * off, oy: dx / L * off };
+  if (seg < NR * K) { c.rib = Math.floor(seg / K); c.s = (seg % K) + t; c.target = Math.min(c.s, K * Math.pow(random(), 2.0)); c.slide = random(0.2, 0.9); }
+  else { c.seg = seg; c.t = t; }
+  sit.push(c);
+}
+function sitPos(c) {
+  let x, y;
+  if (c.rib !== undefined) [x, y] = ribAt(c.rib, c.s);
+  else { const s = M.segs[c.seg]; x = lerpF(s.a[0], s.b[0], c.t); y = lerpF(s.a[1], s.b[1], c.t); }
+  return [x + c.ox * U, y + c.oy * U];
+}
+function liftOff(c) {
+  const [x, y] = sitPos(c), sp = random(0.03, 0.09) * U;
+  fly.push({ ...c, x, y, vx: WIND_DIR[0] * sp + random(-0.02, 0.02) * U, vy: WIND_DIR[1] * sp, hist: [[x, y]], hT: 0, age: 0,
+    tl: Math.floor(random(8, 18)), drag: random(0.9, 1.8), w: random(0.75, 1.15) });
+}
+
+function update(dt) {
+  T += dt;
+  M = buildMesh(T);
+  const S = M.S, wn = S.wind;
+
+  // 1) 天上偶尔落下的星
+  const rRate = 1.5 + 22 * sstep(3, 12, T) * (1 - 0.6 * sstep(60, 66, T));
+  spawnAcc += rRate * dt;
+  while (spawnAcc >= 1) { spawnRain(); spawnAcc--; }
+  const catchR = 0.011 * U, catchR2 = catchR * catchR, [bx0, by0, bx1, by1] = M.box;
+  for (let n = rain.length - 1; n >= 0; n--) {
+    const p = rain[n];
+    const Fr = field(p.x, p.y, T);
+    p.x += (p.vx + Fr[0] * 0.25) * dt; p.y += (p.vy + Fr[1] * 0.12) * dt; p.rot += p.spin * dt;
+    if (p.y > H + 40) { rain.splice(n, 1); continue; }
+    if (S.v < 0.35 || p.x < bx0 || p.x > bx1 || p.y < by0 || p.y > by1) continue;
+    let best = -1, bd = catchR2, bt = 0;
+    for (const s of M.catchable) { const r = segDist(p.x, p.y, M.segs[s].a, M.segs[s].b); if (r[0] < bd) { bd = r[0]; best = s; bt = r[1]; } }
+    if (best >= 0 && random() < 0.35) { sitOn(best, bt, p, random(0.6, 3.5)); bursts.push({ x: p.x, y: p.y, t: 0, s: p.sz }); rain.splice(n, 1); }
+  }
+  // 2) 伞线上自己“长”出星光（越往后越密，伞心最密）
+  const lRate = S.v * (14 + 48 * sstep(3.2, 16, T)) * (0.85 + 0.3 * noise(T * 0.4, 31)) * (1 - 0.5 * sstep(61, 67, T));
+  lineAcc += lRate * dt;
+  while (lineAcc >= 1 && sit.length < MAX_SIT) {
+    lineAcc--;
+    let seg;
+    if (random() < 0.45) { const i = Math.floor(random(NR)); seg = i * K + Math.floor(K * Math.pow(random(), 1.8)); }   // 偏向伞心
+    else seg = M.catchable[Math.floor(random(M.catchable.length))];
+    sitOn(seg, random(), newGlyph(), random(0.8, 5.5) / (0.6 + 0.5 * wn));
+  }
+  if (lineAcc > 5) lineAcc = 5;
+  // 3) 停留的星：沿伞骨往伞心滑，时间到了就被风吹走
+  for (let n = sit.length - 1; n >= 0; n--) {
+    const c = sit[n];
+    if (c.rib !== undefined && c.s > c.target) c.s = Math.max(c.target, c.s - c.slide * dt * S.v);
+    c.rot += c.spin * dt * 0.3;
+    if (T - c.born > c.hold) { liftOff(c); sit.splice(n, 1); }
+  }
+  // 4) 飞走的星：斜向上，带着弯曲的尾巴
+  for (let n = fly.length - 1; n >= 0; n--) {
+    const f = fly[n];
+    f.age += dt;
+    // 跟着风场走：阻力让它逐渐追上当地的风速，阵风来时被推远，风歇时打旋、飘停
+    const F = field(f.x, f.y, T);
+    f.vx += (F[0] * f.w - f.vx) * f.drag * dt; f.vy += (F[1] * f.w - f.vy) * f.drag * dt;
+    f.x += f.vx * dt; f.y += f.vy * dt; f.rot += f.spin * dt;
+    f.hT += dt;
+    if (f.hT > 0.045) { f.hT = 0; f.hist.push([f.x, f.y]); if (f.hist.length > f.tl) f.hist.shift(); }
+    if (f.y < -0.1 * U || f.x > W + 0.1 * U || f.x < -0.2 * U || f.y > H + 0.1 * U) fly.splice(n, 1);
+  }
+  for (let n = bursts.length - 1; n >= 0; n--) { bursts[n].t += dt; if (bursts[n].t > 0.45) bursts.splice(n, 1); }
+  for (const s of air) {
+    const F = field(s.x, s.y, T);
+    s.x += F[0] * s.depth * 0.35 * dt; s.y += (F[1] * s.depth * 0.35 + 0.006 * U) * dt; s.rot += s.spin * dt;
+    if (s.y < -10) { s.y = H + 8; s.x = random(-0.2, 1) * W; } if (s.y > H + 10) s.y = -8;
+    if (s.x > W + 10) { s.x = -8; s.y = random(H); } if (s.x < -12) s.x = W + 8;
+  }
+  for (const d of dust) {
+    d.y -= (2 + 12 * wn * d.r) * PX * 3 * dt; d.x += 5 * wn * d.r * PX * 3 * dt;
+    if (d.y < -4) { d.y = H + 4; d.x = random(W); } if (d.x > W + 4) d.x = -4;
+  }
+  updateCharms(dt, wn);
+}
+
+/* ---------------- 挂件 ---------------- */
+function updateCharms(dt, wn) {
+  const g = 1.0 * U, dt2 = dt * dt;
+  for (const ch of charms) {
+    const anchor = ribAt(ch.rib, ch.s), L = ch.len * U;
+    if (!ch.p) { ch.p = []; ch.q = []; for (let k = 0; k < ch.n; k++) { ch.p.push([anchor[0], anchor[1] + k * L]); ch.q.push([anchor[0], anchor[1] + k * L]); } }
+    const p = ch.p, q = ch.q;
+    p[0][0] = anchor[0]; p[0][1] = anchor[1]; q[0][0] = anchor[0]; q[0][1] = anchor[1];
+    for (let k = 1; k < ch.n; k++) {
+      const vx = (p[k][0] - q[k][0]) * 0.985, vy = (p[k][1] - q[k][1]) * 0.985;
+      q[k][0] = p[k][0]; q[k][1] = p[k][1];
+      const nA = noise(ch.id * 3.1 + k * 0.22, T * 1.9) - 0.5, nB = noise(ch.id * 5.7 + k * 0.3 + 40, T * 1.6) - 0.5;
+      const F = field(p[k][0], p[k][1], T), m = 6.5;
+      const fx = F[0] * m + wn * 1.6 * nA * U, fy = g + F[1] * m + wn * 1.2 * nB * U;
+      p[k][0] += vx + fx * dt2; p[k][1] += vy + fy * dt2;
+    }
+    for (let it = 0; it < 6; it++) for (let k = 1; k < ch.n; k++) {
+      const a = p[k - 1], b = p[k], dx = b[0] - a[0], dy = b[1] - a[1], d = Math.hypot(dx, dy) || 1e-6, diff = (d - L) / d;
+      if (k === 1) { b[0] -= dx * diff; b[1] -= dy * diff; }
+      else { a[0] += dx * diff * 0.5; a[1] += dy * diff * 0.5; b[0] -= dx * diff * 0.5; b[1] -= dy * diff * 0.5; }
+    }
+    const e = p[ch.n - 1], eq = q[ch.n - 1], spd = Math.hypot(e[0] - eq[0], e[1] - eq[1]) / dt;
+    ch.spark = Math.max(0, ch.spark - dt * 2.5);
+    if (spd > 1.05 * U && T - ch.lastSpark > 0.45 && M.S.v > 0.6) { ch.lastSpark = T; ch.spark = 1; }
+  }
+}
+
+/* ---------------- 图元 ---------------- */
+function shapePath(ctx, sh, x, y, s, r) {
+  switch (sh) {
+    case 'spark': { ctx.moveTo(x + Math.cos(r) * s, y + Math.sin(r) * s);
+      for (let i = 1; i < 8; i++) { const a = r + i * Math.PI / 4, rr = i % 2 ? s * 0.3 : s; ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
+      ctx.closePath(); return 'fill'; }
+    case 'star': { ctx.moveTo(x + Math.cos(r) * s, y + Math.sin(r) * s);
+      for (let i = 1; i < 10; i++) { const a = r + i * Math.PI / 5, rr = i % 2 ? s * 0.45 : s; ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
+      ctx.closePath(); return 'fill'; }
+    case 'plus': case 'x': { const a = r * 0.15 + (sh === 'x' ? Math.PI / 4 : 0);
+      for (let i = 0; i < 2; i++) { const aa = a + i * Math.PI / 2, dx = Math.cos(aa) * s, dy = Math.sin(aa) * s; ctx.moveTo(x - dx, y - dy); ctx.lineTo(x + dx, y + dy); }
+      return 'stroke'; }
+    case 'ring': ctx.moveTo(x + s, y); ctx.arc(x, y, s, 0, TAU); return 'stroke';
+    default: ctx.moveTo(x + s * 0.38, y); ctx.arc(x, y, s * 0.38, 0, TAU); return 'fill';
+  }
+}
+function drawShape(ctx, sh, x, y, s, r, a) { ctx.globalAlpha = a; ctx.beginPath(); if (shapePath(ctx, sh, x, y, s, r) === 'fill') ctx.fill(); else ctx.stroke(); }
+function glow(ctx, x, y, r, a) { ctx.globalAlpha = a; ctx.drawImage(glowS, x - r, y - r, r * 2, r * 2); }
+function flare(ctx, x, y, L, a) {
+  if (a <= 0.01) return;
+  ctx.globalAlpha = a; ctx.drawImage(flareS, x - L / 2, y - L / 32, L, L / 16);
+  ctx.save(); ctx.translate(x, y); ctx.rotate(Math.PI / 2);
+  ctx.globalAlpha = a * 0.55; ctx.drawImage(flareS, -L * 0.18, -L / 64, L * 0.36, L / 32);
+  ctx.restore();
+  glow(ctx, x, y, L * 0.08, Math.min(1, a * 1.2));
+}
+function drawPendant(ctx, ch) {
+  const p = ch.p, n = ch.n, e = p[n - 1], b = p[n - 2];
+  const ang = Math.atan2(e[1] - b[1], e[0] - b[0]) - Math.PI / 2, r = 0.012 * U, lw = Math.max(0.8, 1.3 * PX);
+  ctx.save(); ctx.translate(e[0], e[1]); ctx.rotate(ang); ctx.globalAlpha = 0.9; ctx.beginPath();
+  switch (ch.shape) {
+    case 'moon': ctx.lineWidth = r * 0.36; ctx.arc(0, r * 1.05, r * 0.8, -0.35 * Math.PI, 0.95 * Math.PI); ctx.stroke(); break;
+    case 'bell': ctx.lineWidth = lw;
+      ctx.moveTo(-0.15 * r, 0); ctx.quadraticCurveTo(-0.75 * r, 0.15 * r, -0.8 * r, 1.1 * r); ctx.lineTo(0.8 * r, 1.1 * r);
+      ctx.quadraticCurveTo(0.75 * r, 0.15 * r, 0.15 * r, 0); ctx.closePath(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, 1.35 * r, 0.2 * r, 0, TAU); ctx.fill(); break;
+    case 'star': shapePath(ctx, 'star', 0, r, r, -Math.PI / 2 + T * 0.8); ctx.fill(); break;
+    case 'drop': ctx.lineWidth = lw;
+      ctx.moveTo(0, 0); ctx.bezierCurveTo(0.75 * r, 0.9 * r, 0.65 * r, 1.8 * r, 0, 1.8 * r); ctx.bezierCurveTo(-0.65 * r, 1.8 * r, -0.75 * r, 0.9 * r, 0, 0); ctx.stroke(); break;
+    case 'fish': ctx.lineWidth = lw;
+      ctx.ellipse(0, 0.85 * r, 0.42 * r, 0.8 * r, 0, 0, TAU); ctx.moveTo(0, 1.6 * r);
+      ctx.lineTo(-0.5 * r, 2.15 * r + Math.sin(T * 9) * 0.15 * r); ctx.lineTo(0.5 * r, 2.15 * r - Math.sin(T * 9) * 0.15 * r); ctx.closePath(); ctx.stroke(); break;
+  }
+  ctx.restore();
+  glow(ctx, e[0], e[1], r * (2.2 + 3 * ch.spark), 0.3 + 0.5 * ch.spark);
+  if (ch.spark > 0.02) flare(ctx, e[0], e[1], 0.12 * U, ch.spark * 0.7);
+}
+
+/* ---------------- 主循环 ---------------- */
+function draw() {
+  if (started && player && !player.paused && player.currentTime > 0) {
+    const target = player.currentTime; let n = 0;          // 画面跟着声音走，字幕与音乐对齐
+    while (T < target && n < 6) { update(1 / 60); n++; }
+  } else if (started) { const dt = Math.min(1 / 30, deltaTime / 1000 || 1 / 60); update(dt / 2); update(dt / 2); }
+  else if (!M) update(1 / 60);
+  speak();
+  render();
+  if (!started) drawTitle();
+  if (started && T > DUR - 0.05) { restart(); playFromStart(); }
+}
+function speak() {
+  if (!narrOn || !window.speechSynthesis || !started) return;
+  for (let i = 0; i < LINES.length; i++) {
+    const [s] = LINES[i];
+    if (T >= s && T < s + 0.5 && !spoken.has(i)) {
+      spoken.add(i);
+      const u = new SpeechSynthesisUtterance(LINES[i][2].replace(/\n/g, ''));
+      u.lang = 'zh-CN'; u.rate = 0.78; u.volume = 0.95;
+      const v = speechSynthesis.getVoices().find(v => /zh/i.test(v.lang)); if (v) u.voice = v;
+      speechSynthesis.speak(u);
+    }
+  }
+}
+
+function render() {
+  const ctx = drawingContext, S = M.S;
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+  ctx.drawImage(bgG.elt, 0, 0, W, H);
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.fillStyle = '#fff'; ctx.strokeStyle = '#fff'; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const kp = kickPulse(T);
+
+  for (const d of dust) { ctx.globalAlpha = (0.25 + 0.5 * (0.5 + 0.5 * Math.sin(T * d.sp + d.ph))) * 0.55; ctx.fillRect(d.x, d.y, d.s, d.s); }
+  ctx.lineWidth = Math.max(0.6, 1.0 * PX);
+  const airIn = sstep(0.5, 4, T);
+  for (const s of air) {
+    const tw = 0.45 + 0.55 * Math.pow(0.5 + 0.5 * Math.sin(T * s.tw + s.ph), 2);
+    drawShape(ctx, s.shape, s.x, s.y, s.sz, s.rot, s.a * tw * airIn);
+  }
+
+  const fadeIn = sstep(0, 0.35, T);
+  const thin = Math.max(0.6, 0.9 * PX), glyphW = Math.max(0.7, 1.25 * PX);
+
+  // 落下的星（细、少）
+  ctx.lineWidth = thin;
+  for (const p of rain) {
+    const tx = p.x - p.vx * p.trail, ty = p.y - p.vy * p.trail;
+    const g = ctx.createLinearGradient(tx, ty, p.x, p.y);
+    g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(1, `rgba(235,242,255,${0.5 * p.a})`);
+    ctx.strokeStyle = g; ctx.globalAlpha = 1; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(p.x, p.y); ctx.stroke();
+  }
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = glyphW;
+  for (const p of rain) drawShape(ctx, p.shape, p.x, p.y, p.sz, p.rot, 0.8 * p.a);
+
+  // 被风吹走的星：尾巴指回伞面
+  ctx.lineWidth = thin;
+  for (const f of fly) {
+    const h = f.hist; if (h.length < 2) continue;
+    const fade = Math.min(1, f.age * 4);
+    for (let k = 1; k < h.length; k++) {
+      ctx.globalAlpha = (k / h.length) * 0.55 * f.a * fade;
+      ctx.beginPath(); ctx.moveTo(h[k - 1][0], h[k - 1][1]); ctx.lineTo(k === h.length - 1 ? f.x : h[k][0], k === h.length - 1 ? f.y : h[k][1]); ctx.stroke();
+    }
+  }
+  ctx.lineWidth = glyphW;
+  for (const f of fly) drawShape(ctx, f.shape, f.x, f.y, f.sz, f.rot, 0.9 * f.a);
+
+  // 伞：细线 + 很淡的辉光
+  const strokeSegs = (am, width) => {
+    ctx.lineWidth = width;
+    for (const s of M.segs) { if (s.w <= 0.01) continue; ctx.globalAlpha = s.w * am * fadeIn; ctx.beginPath(); ctx.moveTo(s.a[0], s.a[1]); ctx.lineTo(s.b[0], s.b[1]); ctx.stroke(); }
+    ctx.globalAlpha = am * fadeIn; ctx.beginPath();
+    for (const [a, b] of M.shaft) { ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); }
+    ctx.stroke();
+  };
+  const lw = Math.max(0.75, 1.15 * PX);
+  ctx.strokeStyle = 'rgb(170,200,255)'; strokeSegs(0.08, lw * 3.2);
+  ctx.strokeStyle = '#fff'; strokeSegs(0.9, lw);
+  const hk = M.hook[Math.floor(M.hook.length / 2)];
+  glow(ctx, hk[0], hk[1], 0.022 * U, 0.3 * fadeIn);
+
+  // 挂件
+  ctx.lineWidth = thin;
+  for (const ch of charms) {
+    if (!ch.p) continue;
+    ctx.globalAlpha = 0.55 * fadeIn; ctx.beginPath(); ctx.moveTo(ch.p[0][0], ch.p[0][1]);
+    for (let k = 1; k < ch.n; k++) ctx.lineTo(ch.p[k][0], ch.p[k][1]);
+    ctx.stroke(); drawPendant(ctx, ch);
+  }
+
+  // 停在伞线上的星
+  ctx.lineWidth = glyphW;
+  let nearHub = 0;
+  for (const c of sit) {
+    const [x, y] = sitPos(c), age = T - c.born, pop = 1 + 0.8 * Math.exp(-age * 9);
+    drawShape(ctx, c.shape, x, y, c.sz * pop, c.rot, c.a * Math.min(1, age * 6) * (0.7 + 0.3 * Math.sin(T * 3 + c.ph)));
+    if (c.rib !== undefined && c.s < 1.4) nearHub++;
+  }
+  ctx.lineWidth = thin;
+  for (const b of bursts) {
+    const k = b.t / 0.45; ctx.globalAlpha = (1 - k) * 0.6;
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.s * (1 + k * 3), 0, TAU); ctx.stroke();
+    glow(ctx, b.x, b.y, b.s * 3.5, (1 - k) * 0.45);
+  }
+
+  // 光斑：伞心随节拍呼吸
+  const fill = Math.min(1, sit.length / 450);
+  const hubA = (0.25 + 0.8 * fill + 0.2 * Math.min(1, nearHub / 60) + 0.35 * kp) * S.v * (0.88 + 0.12 * Math.sin(T * 2.3));
+  flare(ctx, M.hub[0], M.hub[1], (0.30 + 0.06 * kp) * U, hubA * 0.9);
+  for (let i = 0; i < NR; i++) {
+    const n1 = noise(i * 13.7, T * 0.9);
+    const a = Math.pow(clamp((n1 - 0.45) * 2.2, 0, 1), 2.2) * (0.3 + fill) * S.v;
+    const p = ribAt(i, [K, 3, K, 5, K, 2, K, 4, K, 6][i]);
+    flare(ctx, p[0], p[1], 0.22 * U, a);
+  }
+
+  ctx.globalCompositeOperation = 'source-over';
+  if (capOn) drawCaptions(ctx);
+  const dark = Math.max(1 - sstep(0, 1.0, T), sstep(DUR - 3.0, DUR - 0.3, T));
+  if (dark > 0.001) { ctx.globalAlpha = dark; ctx.fillStyle = 'rgb(8,12,90)'; ctx.fillRect(0, 0, W, H); }
+  ctx.restore();
+}
+function drawCaptions(ctx) {
+  const fs = 0.022 * U;
+  ctx.font = `300 ${fs}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  try { ctx.letterSpacing = `${(fs * 0.16).toFixed(1)}px`; } catch (e) {}
+  for (const [s, e, txt] of LINES) {
+    if (T < s || T > e) continue;
+    const a = sstep(s, s + 1.4, T) * (1 - sstep(e - 1.3, e, T)), rows = txt.split('\n');
+    const y0 = H * 0.875 - (rows.length - 1) * fs * 0.95 + (1 - a) * fs * 0.4;
+    ctx.shadowColor = 'rgba(150,190,255,0.9)'; ctx.shadowBlur = fs * 0.6 * a; ctx.fillStyle = '#fff'; ctx.globalAlpha = a * 0.9;
+    rows.forEach((r, i) => ctx.fillText(r, W / 2, y0 + i * fs * 1.9));
+    ctx.shadowBlur = 0;
+  }
+}
+function drawTitle() {
+  const ctx = drawingContext;
+  ctx.save();
+  ctx.globalAlpha = 0.7; ctx.fillStyle = 'rgb(8,12,90)'; ctx.fillRect(0, 0, W, H);
+  ctx.globalAlpha = 1; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(150,190,255,0.9)'; ctx.shadowBlur = 0.02 * U;
+  ctx.font = `500 ${0.042 * U}px ${FONT}`; try { ctx.letterSpacing = `${0.012 * U}px`; } catch (e) {}
+  ctx.fillText('接住星星的伞', W / 2, H * 0.44);
+  ctx.font = `300 ${0.019 * U}px ${FONT}`; ctx.globalAlpha = 0.6 + 0.3 * Math.sin(millis() / 600);
+  ctx.fillText(audioState === 'rendering' ? '正在准备声音…' : '轻触，入梦 · 请打开声音', W / 2, H * 0.52);
+  ctx.restore();
+}
+
+/* ==========================================================================
+   原创配乐 · 100 BPM 的轻电子
+   0–3.2 秒：闪烁上扬的前奏（伞在翻滚、撑开）
+   3.2 秒落拍：伞被风掀翻，冲击声 + 和弦进入
+   然后：拨弦琶音、暖和弦、底鼓与低音、高处的闪光音，四个和弦循环
+   和弦进行 Fmaj9 – G6 – Em7 – Am9（A 小调），琶音音型为程序生成
+   ========================================================================== */
+function mulberry(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+const CHORDS = [
+  { root: 38, v: [50, 57, 60, 64, 65] },   // Dm(add9)
+  { root: 34, v: [46, 53, 57, 60, 62] },   // B♭maj7
+  { root: 43, v: [55, 58, 62, 65, 69] },   // Gm9
+  { root: 45, v: [52, 57, 61, 62, 67] },   // A7sus4 → A7
+];
+// 主旋律：一句往下走的叹息，四小节一轮。[拍位, 时值(拍), MIDI]
+const MELODY = [
+  [[0, 1.5, 69], [1.5, 0.5, 67], [2, 1, 65], [3, 1, 64]],
+  [[0, 2, 62], [2, 1, 65], [3, 1, 69]],
+  [[0, 1.5, 70], [1.5, 0.5, 69], [2, 1, 67], [3, 1, 65]],
+  [[0, 2.5, 64], [2.5, 1.5, 61]],
+];
+const MELODY2 = [                                   // 第二轮的变奏：落在更低处
+  [[0, 1, 72], [1, 1, 70], [2, 1.5, 69], [3.5, 0.5, 67]],
+  [[0, 3, 65], [3, 1, 62]],
+  [[0, 1, 67], [1, 1, 65], [2, 1.5, 64], [3.5, 0.5, 62]],
+  [[0, 4, 61]],
+];
+
+class Score {
+  constructor(ctx, dest) {
+    const c = this.ctx = ctx; this.rng = mulberry(1020);
+    this.master = c.createGain(); this.master.gain.value = 0.9;
+    const comp = c.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 3.5; comp.attack.value = 0.005; comp.release.value = 0.25;
+    this.master.connect(comp); comp.connect(dest);
+    this.bus = c.createGain(); this.bus.connect(this.master);           // 会被底鼓“压”的总线
+    this.dry = c.createGain(); this.dry.gain.value = 0.75; this.dry.connect(this.bus);
+    this.verb = c.createConvolver(); this.verb.buffer = this.impulse(6.5, 2.2);
+    this.wet = c.createGain(); this.wet.connect(this.verb);
+    const vr = c.createGain(); vr.gain.value = 0.45; this.verb.connect(vr); vr.connect(this.bus);
+    this.dly = c.createDelay(2); this.dly.delayTime.value = BEAT * 0.75;
+    const fb = c.createGain(); fb.gain.value = 0.38; const df = c.createBiquadFilter(); df.type = 'lowpass'; df.frequency.value = 3500;
+    this.dIn = c.createGain(); this.dIn.connect(this.dly); this.dly.connect(df); df.connect(fb); fb.connect(this.dly);
+    const dOut = c.createGain(); dOut.gain.value = 0.5; df.connect(dOut); dOut.connect(this.dry); dOut.connect(this.wet);
+    this.drums = c.createGain(); this.drums.gain.value = 1; this.drums.connect(this.master);  // 鼓不进压缩总线
+    this.noise = this.makeNoise();
+  }
+  impulse(sec, decay) {
+    const c = this.ctx, n = Math.floor(c.sampleRate * sec), b = c.createBuffer(2, n, c.sampleRate), r = mulberry(99);
+    for (let ch = 0; ch < 2; ch++) { const d = b.getChannelData(ch); for (let i = 0; i < n; i++) d[i] = (r() * 2 - 1) * Math.pow(1 - i / n, decay); }
+    return b;
+  }
+  makeNoise() { const c = this.ctx, b = c.createBuffer(1, c.sampleRate * 2, c.sampleRate), d = b.getChannelData(0), r = mulberry(5); for (let i = 0; i < d.length; i++) d[i] = r() * 2 - 1; return b; }
+  out(node, dry, wet, dly, pan) {
+    const c = this.ctx; let n = node;
+    if (pan !== undefined && c.createStereoPanner) { const p = c.createStereoPanner(); p.pan.value = pan; node.connect(p); n = p; }
+    if (dry) { const g = c.createGain(); g.gain.value = dry; n.connect(g); g.connect(this.dry); }
+    if (wet) { const g = c.createGain(); g.gain.value = wet; n.connect(g); g.connect(this.wet); }
+    if (dly) { const g = c.createGain(); g.gain.value = dly; n.connect(g); g.connect(this.dIn); }
+  }
+  now() { return this.ctx.currentTime - this.t0; }
+  mute(m) { this.master.gain.setTargetAtTime(m ? 0 : 0.9, this.ctx.currentTime, 0.1); }
+  dispose() { const c = this.ctx; try { this.master.gain.setTargetAtTime(0, c.currentTime, 0.3); setTimeout(() => c.close && c.close(), 1500); } catch (e) {} }
+
+  start(t0) {
+    this.t0 = t0;
+    this.intro(t0);
+    for (let b = 0; b < 20; b++) {
+      const s = t0 + DROP + b * BAR, sec = section(b), ch = CHORDS[b % 4];
+      if (sec === 'end') {
+        this.pad(s, BAR * 0.6, [38, 50, 57, 60, 64, 65, 69], 1.0, 5.5);
+        this.cello(s, 38, BAR * 0.8, 0.9);
+        [81, 77, 76, 74, 69, 62].forEach((m, i) => this.box(s + i * BEAT * 0.75, m, 0.75 - i * 0.07));   // 一串往下落的音
+        break;
+      }
+      const lvl = sec === 'a' ? 0.7 : sec === 'd' ? 0.8 : 1;
+      this.pad(s, BAR, ch.v, lvl, 1.4);
+      // 八音盒：八分音符，越往后越稀
+      const pool = ch.v.slice(1).map(m => m + 12);
+      for (let i = 0; i < 8; i++) {
+        const keep = i % 2 === 0 || this.rng() < (sec === 'c' ? 0.5 : 0.3);
+        if (!keep || (sec === 'd' && this.rng() < 0.4)) continue;
+        const idx = (i * 3 + b) % pool.length;
+        this.box(s + i * BEAT / 2, pool[idx], (i % 4 === 0 ? 0.7 : 0.45) * (sec === 'a' ? 0.85 : 1));
+      }
+      // 主旋律
+      if (sec === 'b' || sec === 'c') {
+        const mel = (b >= 9 && b < 14 && (b - 9) % 8 >= 4) || b >= 17 ? MELODY2 : MELODY;
+        const oct = sec === 'c' ? 12 : 0;
+        for (const [at, len, m] of mel[b % 4]) this.lead(s + at * BEAT, len * BEAT, m + oct, sec === 'c' ? 0.9 : 0.75);
+      }
+      if (sec === 'c') this.cello(s, ch.root, BAR, 0.8);
+      else this.bass(s, ch.root, BAR * 0.98, sec === 'd' ? 0.45 : 0.6);
+      for (const k of kickBeats(sec)) this.kick(s + k * BEAT, k === 0 ? 0.8 : 0.5);
+      if (sec === 'c' && this.rng() < 0.6) this.glint(s + (2 + Math.floor(this.rng() * 4)) * BEAT / 2, 0.4);
+      if (b === 16) this.riser(s, BAR);
+    }
+    this.master.gain.setValueAtTime(0.9, t0 + DUR - 3.0);
+    this.master.gain.linearRampToValueAtTime(0, t0 + DUR - 0.2);
+  }
+  intro(t0) {
+    const c = this.ctx;
+    // 低处的嗡鸣慢慢升起
+    for (const [m, d] of [[38, -4], [45, 5]]) {
+      const o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.value = mtof(m); o.detune.value = d;
+      const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 260;
+      const g = c.createGain(); g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(0.035, t0 + DROP); g.gain.linearRampToValueAtTime(0, t0 + DROP + 2.5);
+      o.connect(f); f.connect(g); this.out(g, 0.6, 0.8); o.start(t0); o.stop(t0 + DROP + 2.6);
+    }
+    // 由暗到亮的气息
+    const src = c.createBufferSource(); src.buffer = this.noise; src.loop = true;
+    const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.4;
+    bp.frequency.setValueAtTime(350, t0); bp.frequency.exponentialRampToValueAtTime(2400, t0 + DROP);
+    const g = c.createGain(); g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.05, t0 + DROP - 0.05); g.gain.linearRampToValueAtTime(0, t0 + DROP + 0.1);
+    src.connect(bp); bp.connect(g); this.out(g, 0.5, 0.8); src.start(t0); src.stop(t0 + DROP + 0.2);
+    for (let i = 0; i < 18; i++) this.glint(t0 + DROP * Math.pow(i / 18, 0.7), 0.15 + 0.3 * (i / 18));
+    // 伞撑开那一下：一个小三和弦，轻轻拨开
+    [62, 65, 69, 74].forEach((m, i) => this.box(t0 + 0.95 + i * 0.07, m, 0.6));
+    this.impact(t0 + DROP, 0.7);
+  }
+  box(s, m, vel) {                                        // 八音盒 / 钢片琴
+    const c = this.ctx, f = mtof(m), g = c.createGain();
+    g.gain.setValueAtTime(0, s); g.gain.linearRampToValueAtTime(0.05 * vel, s + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, s + 2.6);
+    for (const [mul, amp, dec] of [[1, 1, 2.6], [2, 0.22, 1.0], [3.01, 0.06, 0.5]]) {
+      const o = c.createOscillator(); o.frequency.value = f * mul; const og = c.createGain();
+      og.gain.setValueAtTime(amp, s); og.gain.exponentialRampToValueAtTime(0.0001, s + dec);
+      o.connect(og); og.connect(g); o.start(s); o.stop(s + dec + 0.05);
+    }
+    this.out(g, 0.45, 0.8, 0.4, (this.rng() - 0.5) * 0.7);
+  }
+  lead(s, dur, m, vel) {                                  // 主旋律：带一点颤音的柔和长音，像远处有人哼着
+    const c = this.ctx, f = mtof(m), g = c.createGain();
+    const pk = 0.055 * vel, end = s + dur + 0.6;
+    g.gain.setValueAtTime(0, s); g.gain.linearRampToValueAtTime(pk, s + 0.12); g.gain.setValueAtTime(pk * 0.85, s + dur * 0.8); g.gain.linearRampToValueAtTime(0, end);
+    const vib = c.createOscillator(); vib.frequency.value = 4.6; const vg = c.createGain();
+    vg.gain.setValueAtTime(0, s); vg.gain.linearRampToValueAtTime(f * 0.006, s + Math.min(dur, 0.8));
+    vib.connect(vg);
+    const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2200;
+    for (const [type, mul, amp] of [['sine', 1, 1], ['triangle', 1, 0.35], ['sine', 2, 0.12]]) {
+      const o = c.createOscillator(); o.type = type; o.frequency.value = f * mul; vg.connect(o.frequency);
+      const og = c.createGain(); og.gain.value = amp; o.connect(og); og.connect(lp); o.start(s); o.stop(end + 0.05);
+    }
+    vib.start(s); vib.stop(end + 0.05);
+    lp.connect(g); this.out(g, 0.55, 0.9, 0.25, 0.1);
+  }
+  cello(s, m, dur, vel) {                                 // 低音弦：缓慢起落的长音
+    const c = this.ctx, g = c.createGain(), f = c.createBiquadFilter();
+    f.type = 'lowpass'; f.frequency.value = 520; f.Q.value = 0.8;
+    const pk = 0.05 * vel;
+    g.gain.setValueAtTime(0, s); g.gain.linearRampToValueAtTime(pk, s + 0.7); g.gain.linearRampToValueAtTime(pk * 0.7, s + dur); g.gain.linearRampToValueAtTime(0, s + dur + 1.2);
+    for (const [mul, d] of [[1, -6], [1, 7], [2, 0]]) {
+      const o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.value = mtof(m + 12) * mul; o.detune.value = d;
+      o.connect(f); o.start(s); o.stop(s + dur + 1.3);
+    }
+    f.connect(g); this.out(g, 0.6, 0.8);
+  }
+  pad(s, dur, notes, lvl, rel) {
+    const c = this.ctx, f = c.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 0.7;
+    f.frequency.setValueAtTime(480, s); f.frequency.linearRampToValueAtTime(900, s + dur * 0.6); f.frequency.linearRampToValueAtTime(520, s + dur + rel);
+    const g = c.createGain(), pk = 0.016 * lvl;
+    g.gain.setValueAtTime(0, s); g.gain.linearRampToValueAtTime(pk, s + 0.9); g.gain.setValueAtTime(pk * 0.9, s + dur); g.gain.linearRampToValueAtTime(0, s + dur + rel);
+    for (const m of notes) for (const d of [-8, 7]) {
+      const o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.value = mtof(m); o.detune.value = d; o.connect(f); o.start(s); o.stop(s + dur + rel + 0.05);
+    }
+    f.connect(g); this.out(g, 0.55, 0.8);
+  }
+  pluck(s, m, vel, open, pan) {
+    const c = this.ctx, f = c.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 2;
+    f.frequency.setValueAtTime(open * 1.6, s); f.frequency.exponentialRampToValueAtTime(380, s + 0.35);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0, s); g.gain.linearRampToValueAtTime(0.085 * vel, s + 0.003); g.gain.exponentialRampToValueAtTime(0.0001, s + 0.9);
+    const o = c.createOscillator(); o.type = 'square'; o.frequency.value = mtof(m);
+    const o2 = c.createOscillator(); o2.type = 'triangle'; o2.frequency.value = mtof(m + 12); o2.detune.value = 4;
+    const g2 = c.createGain(); g2.gain.value = 0.5;
+    o.connect(f); o2.connect(g2); g2.connect(f); f.connect(g);
+    o.start(s); o2.start(s); o.stop(s + 0.95); o2.stop(s + 0.95);
+    this.out(g, 0.55, 0.45, 0.35, pan);
+  }
+  glint(s, vel = 0.6) {                                   // 高处的闪光音（像星星眨眼）
+    const c = this.ctx, NOTES = [88, 91, 93, 95, 98, 100, 103];
+    const f = mtof(NOTES[Math.floor(this.rng() * NOTES.length)]), g = c.createGain();
+    g.gain.setValueAtTime(0, s); g.gain.linearRampToValueAtTime(0.012 * vel, s + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, s + 1.2);
+    for (const [mul, amp] of [[1, 1], [2.76, 0.25]]) { const o = c.createOscillator(); o.frequency.value = f * mul; const og = c.createGain(); og.gain.value = amp; o.connect(og); og.connect(g); o.start(s); o.stop(s + 1.25); }
+    this.out(g, 0.3, 0.9, 0.4, (this.rng() * 2 - 1) * 0.8);
+  }
+  kick(s, vel = 1) {
+    const c = this.ctx, o = c.createOscillator(), g = c.createGain();
+    o.frequency.setValueAtTime(95, s); o.frequency.exponentialRampToValueAtTime(40, s + 0.15);
+    g.gain.setValueAtTime(0, s); g.gain.linearRampToValueAtTime(0.22 * vel, s + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, s + 0.6);
+    o.connect(g); g.connect(this.drums); o.start(s); o.stop(s + 0.5);
+  }
+  duck(s) {                                               // 让和声随底鼓起伏
+    const gg = this.bus.gain;
+    for (let k = 0; k < 4; k += 2) { const t = s + k * BEAT; gg.setValueAtTime(1, t); gg.linearRampToValueAtTime(0.55, t + 0.02); gg.linearRampToValueAtTime(1, t + BEAT * 0.9); }
+  }
+  bass(s, m, dur, vel) {
+    const c = this.ctx, o = c.createOscillator(), f = c.createBiquadFilter(), g = c.createGain();
+    o.type = 'sawtooth'; o.frequency.value = mtof(m);
+    const sub = c.createOscillator(); sub.frequency.value = mtof(m - 12); const sg = c.createGain(); sg.gain.value = 0.9;
+    f.type = 'lowpass'; f.frequency.setValueAtTime(420, s); f.frequency.exponentialRampToValueAtTime(160, s + dur); f.Q.value = 1.5;
+    g.gain.setValueAtTime(0, s); g.gain.linearRampToValueAtTime(0.055 * vel, s + 0.01); g.gain.setValueAtTime(0.05 * vel, s + dur * 0.8); g.gain.linearRampToValueAtTime(0, s + dur);
+    o.connect(f); sub.connect(sg); sg.connect(f); f.connect(g); g.connect(this.drums);
+    o.start(s); sub.start(s); o.stop(s + dur + 0.05); sub.stop(s + dur + 0.05);
+  }
+  hat(s, vel) {
+    const c = this.ctx, src = c.createBufferSource(); src.buffer = this.noise;
+    const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 7500;
+    const g = c.createGain(); g.gain.setValueAtTime(0.03 * vel, s); g.gain.exponentialRampToValueAtTime(0.0001, s + 0.06);
+    src.connect(hp); hp.connect(g); this.out(g, 0.6, 0.15, 0, 0.3); src.start(s, this.rng()); src.stop(s + 0.08);
+  }
+  clap(s) {
+    const c = this.ctx, src = c.createBufferSource(); src.buffer = this.noise;
+    const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1600; bp.Q.value = 0.9;
+    const g = c.createGain(); g.gain.setValueAtTime(0, s);
+    for (const d of [0, 0.012, 0.024]) { g.gain.setValueAtTime(0.09, s + d); g.gain.exponentialRampToValueAtTime(0.01, s + d + 0.011); }
+    g.gain.setValueAtTime(0.06, s + 0.036); g.gain.exponentialRampToValueAtTime(0.0001, s + 0.25);
+    src.connect(bp); bp.connect(g); this.out(g, 0.5, 0.6); src.start(s, this.rng()); src.stop(s + 0.3);
+  }
+  impact(s, vel) {                                        // 落拍的冲击：低沉一击 + 散开的亮噪声
+    const c = this.ctx;
+    const o = c.createOscillator(), g = c.createGain();
+    o.frequency.setValueAtTime(90, s); o.frequency.exponentialRampToValueAtTime(30, s + 1.2);
+    g.gain.setValueAtTime(0.3 * vel, s); g.gain.exponentialRampToValueAtTime(0.0001, s + 1.6);
+    o.connect(g); g.connect(this.drums); o.start(s); o.stop(s + 1.7);
+    const src = c.createBufferSource(); src.buffer = this.noise; src.loop = true;
+    const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 3000;
+    const ng = c.createGain(); ng.gain.setValueAtTime(0.06 * vel, s); ng.gain.exponentialRampToValueAtTime(0.0001, s + 2.2);
+    src.connect(hp); hp.connect(ng); this.out(ng, 0.4, 0.9); src.start(s); src.stop(s + 2.3);
+  }
+  riser(s, dur) {
+    const c = this.ctx, src = c.createBufferSource(); src.buffer = this.noise; src.loop = true;
+    const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.5;
+    bp.frequency.setValueAtTime(400, s); bp.frequency.exponentialRampToValueAtTime(5000, s + dur);
+    const g = c.createGain(); g.gain.setValueAtTime(0.0001, s); g.gain.exponentialRampToValueAtTime(0.06, s + dur - 0.05); g.gain.linearRampToValueAtTime(0, s + dur);
+    src.connect(bp); bp.connect(g); this.out(g, 0.6, 0.6); src.start(s); src.stop(s + dur + 0.1);
+  }
+  bellRun(s) { [76, 79, 83, 86, 88, 91].forEach((m, i) => this.pluck(s + i * BEAT / 2, m, 0.8 - i * 0.06, 3000, (i % 2 ? 0.4 : -0.4))); }
+}
+
+/* ---------------- 离线工具 ---------------- */
+window.__seek = (sec) => { restart(); started = true; while (T < sec) update(1 / 60); render(); };
+window.__beginRender = () => { restart(); started = true; };
+window.__frame = (fps) => { const n = Math.round(60 / fps); for (let i = 0; i < n; i++) update(1 / 60); render(); return T; };
+window.__renderAudio = async () => {
+  const sr = 44100, ctx = new OfflineAudioContext(2, Math.ceil(sr * DUR), sr);
+  const d = new Score(ctx, ctx.destination); d.start(0);
+  const buf = await ctx.startRendering();
+  const L = buf.getChannelData(0), R = buf.getChannelData(1), n = L.length, out = new Int16Array(n * 2);
+  for (let i = 0; i < n; i++) { out[2 * i] = clamp(L[i], -1, 1) * 32767; out[2 * i + 1] = clamp(R[i], -1, 1) * 32767; }
+  let s = ''; const u8 = new Uint8Array(out.buffer);
+  for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+  return { sr, b64: btoa(s) };
+};
+</script>
+</body>
+</html>
